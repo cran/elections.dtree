@@ -11,15 +11,14 @@
 // Calculates the factors with which to multiply a0 in order to obtain the
 // interior parameters which reduce to a Dirichlet distribution.
 void IRVParameters::calculateDepthFactors() {
-  depthFactors = std::vector<float>(maxDepth);
+  depthFactors = std::vector<double>(maxDepth);
   // The number of children to a node for a given depth in the tree.
   unsigned nChildren;
   // For each depth, maxDepth-1 through 0, we calculate the factors.
-  float f = 1.;
+  double f = 1.;
   for (int depth = maxDepth - 1; depth >= 0; --depth) {
     nChildren = nCandidates - depth;
-    if (depth >= minDepth)
-      ++nChildren;
+    if (depth >= minDepth) ++nChildren;
     depthFactors[depth] = f;
     f = f * nChildren;
   }
@@ -28,22 +27,21 @@ void IRVParameters::calculateDepthFactors() {
 std::list<IRVBallotCount> lazyIRVBallots(IRVParameters *params, unsigned count,
                                          std::vector<unsigned> path,
                                          unsigned depth, std::mt19937 *engine) {
-
   // Get parameters
   unsigned nCandidates = params->getNCandidates();
-  float minDepth = params->getMinDepth();
-  float maxDepth = params->getMaxDepth();
-  float a0 = params->getA0();
-  if (params->getVD())
-    a0 = a0 * params->depthFactor(depth);
+  double minDepth = params->getMinDepth();
+  double maxDepth = params->getMaxDepth();
+  double a0 = params->getA0();
+  if (params->getVD()) a0 = a0 * params->depthFactor(depth);
 
   std::list<IRVBallotCount> out = {};
 
-  float *a;
-  unsigned *mnomCounts;
+  std::vector<unsigned> mnomCounts;
 
   unsigned nChildren = nCandidates - depth;
   unsigned nOutcomes = nChildren + (depth >= minDepth);
+
+  std::vector<double> a(nOutcomes);
 
   if (depth == nCandidates - 1 || depth == maxDepth) {
     // If the ballot is completely specified, return count * the specified
@@ -58,10 +56,8 @@ std::list<IRVBallotCount> lazyIRVBallots(IRVParameters *params, unsigned count,
   // ballots terminate).
 
   // We start by initializing a to the appropriate values.
-  a = new float[nOutcomes];
-  for (unsigned i = 0; i < nOutcomes; ++i)
-    a[i] = a0;
-  mnomCounts = rDirichletMultinomial(count, a, nOutcomes, engine);
+  for (unsigned i = 0; i < nOutcomes; ++i) a[i] = a0;
+  mnomCounts = rDirichletMultinomial(count, a, engine);
 
   // Add the ballots which terminate at this node.
   if (depth >= minDepth && mnomCounts[nOutcomes - 1] > 0) {
@@ -73,8 +69,7 @@ std::list<IRVBallotCount> lazyIRVBallots(IRVParameters *params, unsigned count,
 
   for (unsigned i = 0; i < nChildren; ++i) {
     // Skip if there the sampled count for the subtree is zero.
-    if (mnomCounts[i] == 0)
-      continue;
+    if (mnomCounts[i] == 0) continue;
 
     // Update path for recursive sampling.
     std::swap(path[depth], path[depth + i]);
@@ -85,9 +80,6 @@ std::list<IRVBallotCount> lazyIRVBallots(IRVParameters *params, unsigned count,
     std::swap(path[depth], path[depth + i]);
   }
 
-  delete[] mnomCounts;
-  delete[] a;
-
   return out;
 }
 
@@ -96,9 +88,8 @@ IRVNode::IRVNode(unsigned depth_, IRVParameters *parameters_) {
   nChildren = parameters->getNCandidates() - depth_;
   depth = depth_;
 
-  as = new float[nChildren + 1]; // +1 for incomplete ballots
-  for (unsigned i = 0; i < nChildren + 1; ++i)
-    as[i] = 0.;
+  as = new double[nChildren + 1];  // +1 for incomplete ballots
+  for (unsigned i = 0; i < nChildren + 1; ++i) as[i] = 0.;
 
   children = new NodeP[nChildren]{nullptr};
 }
@@ -108,8 +99,7 @@ IRVNode::~IRVNode() {
   // initialized nodes in the sub-tree before removing the array.
   delete[] as;
   for (unsigned i = 0; i < nChildren; ++i) {
-    if (children[i] != nullptr)
-      delete children[i];
+    if (children[i] != nullptr) delete children[i];
   }
   delete[] children;
 }
@@ -117,26 +107,22 @@ IRVNode::~IRVNode() {
 std::list<IRVBallotCount> IRVNode::sample(unsigned count,
                                           std::vector<unsigned> path,
                                           std::mt19937 *engine) {
-
   std::list<IRVBallotCount> out = {};
 
   unsigned minDepth = parameters->getMinDepth();
   unsigned maxDepth = parameters->getMaxDepth();
-  float a0 = parameters->getA0();
-  if (parameters->getVD())
-    a0 = a0 * parameters->depthFactor(depth);
+  double a0 = parameters->getA0();
+  if (parameters->getVD()) a0 = a0 * parameters->depthFactor(depth);
 
   unsigned nOutcomes = nChildren + (depth >= minDepth);
 
-  float *asPost = new float[nOutcomes];
-  for (unsigned i = 0; i < nOutcomes; ++i)
-    asPost[i] = as[i] + a0;
+  std::vector<double> asPost(nOutcomes);
+  for (unsigned i = 0; i < nOutcomes; ++i) asPost[i] = as[i] + a0;
 
   // Get Dirichlet-multinomial counts for next-preference selections below
   // current node.
-  unsigned *mnomCounts =
-      rDirichletMultinomial(count, asPost, nOutcomes, engine);
-  delete[] asPost;
+  std::vector<unsigned> mnomCounts =
+      rDirichletMultinomial(count, asPost, engine);
 
   // Add terminal node ballots
   if (depth >= minDepth && mnomCounts[nChildren] > 0) {
@@ -150,8 +136,7 @@ std::list<IRVBallotCount> IRVNode::sample(unsigned count,
   if (depth == maxDepth - 1) {
     for (unsigned i = 0; i < nChildren; ++i) {
       // Skip if there the sampled count for the ballot is zero.
-      if (mnomCounts[i] == 0)
-        continue;
+      if (mnomCounts[i] == 0) continue;
 
       std::swap(path[depth], path[depth + i]);
 
@@ -162,7 +147,6 @@ std::list<IRVBallotCount> IRVNode::sample(unsigned count,
       std::swap(path[depth], path[depth + i]);
     }
     // Return early since there are no child nodes to sample from.
-    delete[] mnomCounts;
     return out;
   }
 
@@ -170,10 +154,8 @@ std::list<IRVBallotCount> IRVNode::sample(unsigned count,
   // not specified, then we lazily generate samples from a uniform dirichlet
   // tree.
   for (unsigned i = 0; i < nChildren; ++i) {
-
     // Skip if there the sampled count for the subtree is zero.
-    if (mnomCounts[i] == 0)
-      continue;
+    if (mnomCounts[i] == 0) continue;
 
     // Sample from the next subtree.
     std::swap(path[depth], path[depth + i]);
@@ -187,8 +169,6 @@ std::list<IRVBallotCount> IRVNode::sample(unsigned count,
     }
     std::swap(path[depth], path[depth + i]);
   }
-
-  delete[] mnomCounts;
 
   return out;
 }
@@ -215,22 +195,19 @@ void IRVNode::update(const IRVBallot &b, std::vector<unsigned> path,
 
   // Determine the next candidate preference.
   auto it = b.preferences.begin();
-  for (unsigned i = 0; i < depth; ++i)
-    ++it;
+  for (unsigned i = 0; i < depth; ++i) ++it;
   unsigned nextCandidate = *it;
 
   // Find the index of the next candidate, and increment the corresponding
   // parameter.
   unsigned i = depth;
-  while (path[i] != nextCandidate)
-    ++i;
+  while (path[i] != nextCandidate) ++i;
   unsigned next_idx = i - depth;
   as[next_idx] += count;
 
   // Stop traversing if the number of children is 2, since we don't need to
   // access the leaves.
-  if (nChildren == 2)
-    return;
+  if (nChildren == 2) return;
 
   // If the next node is uninitialized, we create a new one with one less
   // candidate to choose from.

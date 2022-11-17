@@ -3,6 +3,8 @@
 Perform ballot-polling Bayesian audits for ranked voting elections using a Dirichlet-tree prior distribution.
 
   <!-- badges: start -->
+  [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/elections.dtree)](https://cran.r-project.org/package=elections.dtree)
+  [![pkgdown](https://github.com/fleverest/elections.dtree/workflows/pkgdown/badge.svg)](https://fleverest.github.io/elections.dtree/)
   [![R-CMD-check](https://github.com/fleverest/elections.dtree/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/fleverest/elections.dtree/actions/workflows/R-CMD-check.yaml)
   [![Codecov test coverage](https://codecov.io/gh/fleverest/elections.dtree/branch/main/graph/badge.svg)](https://app.codecov.io/gh/fleverest/elections.dtree?branch=main)
   <!-- badges: end -->
@@ -12,16 +14,18 @@ Perform ballot-polling Bayesian audits for ranked voting elections using a Diric
 
 #### CRAN
 
-TBD
+To install the latest minor release of `elections.dtree` from CRAN:
+```R
+install.packages("elections.dtree")
+```
 
 #### Development
 
-To install the development version of `elections.dtree` from GitHub:
+To install the development release of `elections.dtree` from GitHub:
 ```R
 # install.packages("remotes")
 remotes::install_github("fleverest/elections.dtree")
 ```
-
 
 ## About the project
 
@@ -39,9 +43,9 @@ ballot types is small, but becomes problematic when this number gets large.  As
 `n` grows, the prior concentration parameters (defined by `a0` in our
 implementation) need to be on the order of `1 / n!` to ensure the prior is not
 overly informative.  If `n` is large enough, this may be smaller than the
-available floating-point precision.  Also, the fact that this varies by `n` is
-inconvenient.  A more practical alternative is given by the Dirichlet-tree
-distribution, which we implement in this package.
+available precision.  Also, the fact that this varies by `n` is inconvenient.
+A more practical alternative is given by the Dirichlet-tree distribution,
+which we implement in this package.
 
 The Dirichlet-tree distribution consists of nested Dirichlet distributions,
 arranged hierarchically in a tree structure.  The structure represents the

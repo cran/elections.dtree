@@ -43,7 +43,7 @@ std::list<IRVBallotCount> RDirichletTree::parseBallotList(Rcpp::List bs) {
 
 RDirichletTree::RDirichletTree(Rcpp::CharacterVector candidates,
                                unsigned minDepth_, unsigned maxDepth_,
-                               float a0_, bool vd_, std::string seed_) {
+                               double a0_, bool vd_, std::string seed_) {
   // Parse the candidate strings.
   std::string cName;
   size_t cIndex = 0;
@@ -75,12 +75,11 @@ unsigned RDirichletTree::getMinDepth() {
 unsigned RDirichletTree::getMaxDepth() {
   return tree->getParameters()->getMaxDepth();
 }
-float RDirichletTree::getA0() { return tree->getParameters()->getA0(); }
+double RDirichletTree::getA0() { return tree->getParameters()->getA0(); }
 bool RDirichletTree::getVD() { return tree->getParameters()->getVD(); }
 Rcpp::CharacterVector RDirichletTree::getCandidates() {
   Rcpp::CharacterVector out{};
-  for (const auto &[candidate, idx] : candidateMap)
-    out.push_back(candidate);
+  for (const auto &[candidate, idx] : candidateMap) out.push_back(candidate);
   return out;
 }
 
@@ -112,7 +111,7 @@ void RDirichletTree::setMaxDepth(unsigned maxDepth_) {
   tree->getParameters()->setMaxDepth(maxDepth_);
 }
 
-void RDirichletTree::setA0(float a0_) { tree->getParameters()->setA0(a0_); }
+void RDirichletTree::setA0(double a0_) { tree->getParameters()->setA0(a0_); }
 
 void RDirichletTree::setVD(bool vd_) { tree->getParameters()->setVD(vd_); }
 
@@ -155,7 +154,6 @@ void RDirichletTree::update(Rcpp::List ballots) {
 
 Rcpp::List RDirichletTree::samplePredictive(unsigned nSamples,
                                             std::string seed) {
-
   tree->setSeed(seed);
 
   Rcpp::List out;
@@ -181,20 +179,19 @@ Rcpp::NumericVector RDirichletTree::samplePosterior(unsigned nElections,
                                                     unsigned nWinners,
                                                     unsigned nThreads,
                                                     std::string seed) {
-
   if (nBallots < nObserved)
-    Rcpp::stop("`nBallots` must be larger than the number of ballots "
-               "observed to obtain the posterior.");
+    Rcpp::stop(
+        "`nBallots` must be larger than the number of ballots "
+        "observed to obtain the posterior.");
 
   tree->setSeed(seed);
 
   size_t nCandidates = getNCandidates();
 
-  // Generate nBatches PRNGs.
+  // Generate PRNG seeds.
   std::mt19937 *treeGen = tree->getEnginePtr();
   std::vector<unsigned> seeds{};
-  unsigned nBatches = nElections / 2;
-  for (unsigned i = 0; i <= nBatches; ++i) {
+  for (unsigned i = 0; i <= nThreads; ++i) {
     seeds.push_back((*treeGen)());
   }
 
@@ -204,52 +201,48 @@ Rcpp::NumericVector RDirichletTree::samplePosterior(unsigned nElections,
     batchSize = 0;
     batchRemainder = nElections;
   } else {
-    batchSize = nElections / nBatches;
-    batchRemainder = nElections % nBatches;
+    batchSize = nElections / nThreads;
+    batchRemainder = nElections % nThreads;
   }
 
   // The results vector for each thread.
-  std::vector<std::vector<std::vector<unsigned>>> results(nBatches + 1);
+  std::vector<std::vector<unsigned>> results(nElections);
 
-  // Use RcppThreads to compute the posterior in batches.
-  auto getBatchResult = [&](size_t i, size_t batchSize) -> void {
-    // Check for interrupt.
-    RcppThread::checkUserInterrupt();
-
+  // Use multiple threads to compute the posterior in batches.
+  auto processBatch = [&](size_t thread_idx, size_t size) -> void {
     // Seed a new PRNG, and warm it up.
-    std::mt19937 e(seeds[i]);
+    std::mt19937 e(seeds[thread_idx]);
     e.discard(e.state_size * 100);
 
-    // Simulate elections.
-    std::list<std::list<IRVBallotCount>> elections =
-        tree->posteriorSets(batchSize, nBallots, &e);
-
-    for (auto &el : elections)
-      results[i].push_back(socialChoiceIRV(el, nCandidates, &e));
+    for (unsigned j = 0; j < size; ++j) {
+      // Check for interrupt.
+      RcppThread::checkUserInterrupt();
+      // Simulate election.
+      std::list<IRVBallotCount> election = tree->posteriorSet(nBallots, &e);
+      // Evaluate social choice function.
+      results[thread_idx * batchSize + j] =
+          socialChoiceIRV(election, nCandidates, &e);
+    }
   };
 
-  // Dispatch the jobs.
-  RcppThread::ThreadPool pool(nThreads);
-
-  // Process batches on workers
-  pool.parallelFor(0, nBatches,
-                   [&](size_t i) { getBatchResult(i, batchSize); });
+  // Dispatch the jobs
+  std::vector<std::thread> pool(nThreads);
+  for (unsigned i = 0; i < nThreads; ++i) {
+    pool[i] = std::thread(std::bind(processBatch, i, batchSize));
+  }
 
   // Process remainder on main thread.
-  if (batchRemainder > 0)
-    getBatchResult(nBatches, batchRemainder);
+  processBatch(nThreads, batchRemainder);
 
-  pool.join();
+  // Join the threads
+  std::for_each(pool.begin(), pool.end(), [](std::thread &t) { t.join(); });
 
   // Aggregate the results
   Rcpp::NumericVector out(nCandidates);
   out.names() = candidateVector;
-
-  for (unsigned j = 0; j <= nBatches; ++j) {
-    for (auto elimination_order_idx : results[j]) {
-      for (auto i = nCandidates - nWinners; i < nCandidates; ++i)
-        out[elimination_order_idx[i]] = out[elimination_order_idx[i]] + 1;
-    }
+  for (unsigned j = 0; j < nElections; ++j) {
+    for (auto i = nCandidates - nWinners; i < nCandidates; ++i)
+      out[results[j][i]] = out[results[j][i]] + 1;
   }
 
   out = out / nElections;
