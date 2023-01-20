@@ -10,7 +10,7 @@ Authors@R: c(
                 person("Damjan", "Vukcevic", email = "damjan@vukcevic.net",
                     role = c("aut"), comment = c(ORCID = "0000-0001-7780-9586"))
             )
-Version: 1.1.1
+Version: 1.1.2
 Depends: R (>= 4.0.0)
 SystemRequirements: C++17
 License: GPL-3
@@ -25,9 +25,9 @@ URL: https://fleverest.github.io/elections.dtree/,
         https://github.com/fleverest/elections.dtree/
 BugReports: https://github.com/fleverest/elections.dtree/issues/
 NeedsCompilation: yes
-Packaged: 2023-01-18 05:36:53 UTC; dev
+Packaged: 2023-01-20 01:25:54 UTC; dev
 Author: Floyd Everest [aut, cre, cph] (<https://orcid.org/0000-0002-2726-6736>),
   Damjan Vukcevic [aut] (<https://orcid.org/0000-0001-7780-9586>)
 Maintainer: Floyd Everest <me@floydeverest.com>
 Repository: CRAN
-Date/Publication: 2023-01-18 08:30:02 UTC
+Date/Publication: 2023-01-20 07:30:02 UTC
