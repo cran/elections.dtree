@@ -10,13 +10,13 @@ Authors@R: c(
                 person("Damjan", "Vukcevic", email = "damjan@vukcevic.net",
                     role = c("aut"), comment = c(ORCID = "0000-0001-7780-9586"))
             )
-Version: 1.1.2
+Version: 2.0.0
 Depends: R (>= 4.0.0)
 SystemRequirements: C++17
 License: GPL-3
-RoxygenNote: 7.2.2
+RoxygenNote: 7.2.3
 LinkingTo: Rcpp, RcppThread, testthat
-Imports: Rcpp, methods, Rdpack, R6, parallel
+Imports: Rcpp, methods, Rdpack, R6, parallel, prefio (>= 0.1.1)
 RdMacros: Rdpack
 Suggests: covr, testthat (>= 3.0.0), xml2
 Config/testthat/edition: 3
@@ -25,9 +25,9 @@ URL: https://fleverest.github.io/elections.dtree/,
         https://github.com/fleverest/elections.dtree/
 BugReports: https://github.com/fleverest/elections.dtree/issues/
 NeedsCompilation: yes
-Packaged: 2023-01-20 01:25:54 UTC; dev
+Packaged: 2023-09-16 11:13:15 UTC; dev
 Author: Floyd Everest [aut, cre, cph] (<https://orcid.org/0000-0002-2726-6736>),
   Damjan Vukcevic [aut] (<https://orcid.org/0000-0001-7780-9586>)
 Maintainer: Floyd Everest <me@floydeverest.com>
 Repository: CRAN
-Date/Publication: 2023-01-20 07:30:02 UTC
+Date/Publication: 2023-09-16 11:30:02 UTC
